@@ -3,6 +3,7 @@ package eisemann.view;
 import java.io.File;
 
 import eisemann.EisemannApp;
+import eisemann.ImageController;
 import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
@@ -68,8 +69,7 @@ public class ContentController {
 	@FXML
 	private void handleResultAction(ActionEvent event) {
 		if (imageController.getImageNoFlash() != null && imageController.getImageFlash() != null) {
-			//imageController.getIntensity();
-			imageController.getColor();
+			imageController.getFinal();
 			
 			Image image = imageController.getImageResult();
 			Image imageTest = imageController.getImageResultTest(); //TODO:Delete in final version
