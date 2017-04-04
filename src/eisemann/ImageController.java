@@ -89,8 +89,7 @@ public class ImageController {
 		Mat finalG = new Mat();
 		Mat finalB = new Mat();
 		Mat image = new Mat();
-		Mat weightsWB = new Mat();
-		List<Double> weights = new ArrayList();
+		List<Double> weights = whiteBalanceCorr(imgFlash, imgNoFlash);
 		
 		color.convertTo(color, CvType.CV_64F);
 		largeScaleNF.convertTo(largeScaleNF, CvType.CV_64F);
@@ -104,22 +103,20 @@ public class ImageController {
 		Core.add(image, rgb.get(1), finalG);
 		Core.add(image, rgb.get(2), finalB);
 		
-		weights = whiteBalanceCorr(imgFlash, imgNoFlash);
-		Mat wb = weightsWB.diag(0);
-		wb.put(0, 0, weights.get(0));
-		wb.put(1, 1, weights.get(1));
-		wb.put(2, 2, weights.get(2));
+		Scalar R = new Scalar(weights.get(0));
+		Scalar G = new Scalar(weights.get(1));
+		Scalar B = new Scalar(weights.get(2));
+		
+		// White balance correction
+		Core.multiply(finalR, R, finalR);
+		Core.multiply(finalG, G, finalG);
+		Core.multiply(finalB, B, finalB);
 
 		List<Mat> finalRGB = new ArrayList<Mat>(3);
 		finalRGB.add(0,finalR);
 		finalRGB.add(1,finalG);
 		finalRGB.add(2,finalB);
 		Core.merge(finalRGB, image);
-		
-		System.out.println(image.cols() + " " + image.rows());
-		System.out.println(wb.cols() + " " + wb.rows());
-		
-		Core.multiply(wb, image, image);
 
 		Imgcodecs.imencode(".jpg", bcNormalize(image), buffer);
 		imageResult = new Image(new ByteArrayInputStream(buffer.toArray()));
@@ -140,6 +137,7 @@ public class ImageController {
 		imgF.convertTo(imgF, CvType.CV_64F);
 		imgNF.convertTo(imgNF, CvType.CV_64F);
 		Mat output = new Mat();
+		double pow = 0.1;
 		double weightR = 0.0;
 		double weightG = 0.0;
 		double weightB = 0.0;
@@ -147,22 +145,12 @@ public class ImageController {
 		List<Mat> imgFRGB = getRGB(imgF);
 		List<Mat> imgNFRGB = getRGB(imgNF);
 		
-		weightR = (getSum(getBrightPixels(imgFRGB.get(0), getMax(imgFRGB.get(0)) - 20)) 
-				+ getSum(getBrightPixels(imgNFRGB.get(0), getMax(imgFRGB.get(0)) - 20))) 
-				/ getBrightPixels(imgFRGB.get(0), getMax(imgFRGB.get(0)) - 20).size() 
-				+ getBrightPixels(imgNFRGB.get(0), getMax(imgFRGB.get(0)) - 20).size();
-		weightG = (getSum(getBrightPixels(imgFRGB.get(1), getMax(imgFRGB.get(1)) - 10)) 
-				+ getSum(getBrightPixels(imgNFRGB.get(1), getMax(imgFRGB.get(1)) - 10))) 
-				/ getBrightPixels(imgFRGB.get(1), getMax(imgFRGB.get(1)) - 10).size() 
-				+ getBrightPixels(imgNFRGB.get(1), getMax(imgFRGB.get(1)) - 10).size();
-		weightB = (getSum(getBrightPixels(imgFRGB.get(2), getMax(imgFRGB.get(2)))) 
-				+ getSum(getBrightPixels(imgNFRGB.get(2), getMax(imgFRGB.get(2))))) 
-				/ getBrightPixels(imgFRGB.get(2), getMax(imgFRGB.get(2))).size() 
-				+ getBrightPixels(imgNFRGB.get(2), getMax(imgFRGB.get(2))).size();
-		
-		System.out.println(weightR);
-		System.out.println(weightG);
-		System.out.println(weightB);
+		weightR = Math.pow((double)(0.4*getSum(getBrightPixels(imgFRGB.get(0), getMax(imgFRGB.get(0)))) 
+				+ 0.6*getSum(getBrightPixels(imgNFRGB.get(0), getMax(imgNFRGB.get(0))))) , pow);
+		weightG =  Math.pow((double)(0.4*getSum(getBrightPixels(imgFRGB.get(1), getMax(imgFRGB.get(1)))) 
+				+ 0.6*getSum(getBrightPixels(imgNFRGB.get(1), getMax(imgNFRGB.get(1))))), pow);
+		weightB =  Math.pow((double)(0.4*getSum(getBrightPixels(imgFRGB.get(2), getMax(imgFRGB.get(2)))) 
+				+ 0.6*getSum(getBrightPixels(imgNFRGB.get(2), getMax(imgNFRGB.get(2))))) , pow);
 		
 		weights.add(weightR);
 		weights.add(weightG);
@@ -283,7 +271,7 @@ public class ImageController {
 	}
 	
 	/**
-     * Method computes bright pixels for WB correstion
+     * Method computes bright pixels for WB correction
      * @param channel matrix, bright pixel value boundary
      * @return list of bright pixels
     */
@@ -293,11 +281,10 @@ public class ImageController {
 		
 		Iterator<Double> iterator = ch.iterator();
 		while (iterator.hasNext()) {
-			if (iterator.next() >= brPixel) {
+			if (iterator.next() == brPixel) {
 				brPixels.add(iterator.next());
 			}
 		}
-		//System.out.println(brPixels.size());
 		return brPixels;
 	}
 	

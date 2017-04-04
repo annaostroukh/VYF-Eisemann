@@ -70,7 +70,6 @@ public class ContentController {
 	private void handleResultAction(ActionEvent event) {
 		if (imageController.getImageNoFlash() != null && imageController.getImageFlash() != null) {
 			imageController.getFinal();
-			
 			Image image = imageController.getImageResult();
 			Image imageTest = imageController.getImageResultTest(); //TODO:Delete in final version
 			imageViewResult.setImage(image);
