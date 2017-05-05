@@ -71,16 +71,9 @@ public class ContentController {
 		if (imageController.getImageNoFlash() != null && imageController.getImageFlash() != null) {
 			imageController.getFinal();
 			Image image = imageController.getImageResult();
-			Image imageTest = imageController.getImageResultTest(); //TODO:Delete in final version
 			imageViewResult.setImage(image);
-			imageViewResultTest.setImage(imageTest);
 		}
 			
-	}
-	
-	@FXML
-	private void handleExportAction(ActionEvent event) {
-		
 	}
 	
 	private void loadImage(File file) {

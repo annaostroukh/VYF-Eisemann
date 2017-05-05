@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -12,10 +13,11 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
+import org.opencv.core.MatOfFloat;
+import org.opencv.core.MatOfInt;
 import org.opencv.core.Scalar;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
-import org.opencv.utils.Converters;
 
 import javafx.scene.image.Image;
 
@@ -24,7 +26,6 @@ public class ImageController {
 	private String imageNoFlash;
 	private String imageFlash;
 	private Image imageResult;
-	private Image imageResultTest;
 
 	private Mat imgNoFlash;
 	private Mat imgFlash;
@@ -54,13 +55,6 @@ public class ImageController {
 		this.imageResult = imageResult;
 	}
 	
-	public Image getImageResultTest() {
-		return imageResultTest;
-	}
-
-	public void setImageResultTest(Image imageResultTest) {
-		this.imageResultTest = imageResultTest;
-	}
 
 	public ImageController() {
 		imgNoFlash = new Mat();
@@ -84,7 +78,9 @@ public class ImageController {
 		Mat largeScaleNF = computeLargeScale(intensityNF);
 		Mat largeScaleF = computeLargeScale(intensityF);
 		Mat detail = computeDetail(intensityF, largeScaleF);
+		Mat detailNF = computeDetail(intensityNF, largeScaleNF);
 		Mat color = computeColor(imgFlash, intensityF);
+		Mat colorNF = computeColor(imgNoFlash, intensityNF);
 		Mat finalR = new Mat();
 		Mat finalG = new Mat();
 		Mat finalB = new Mat();
@@ -122,10 +118,44 @@ public class ImageController {
 		imageResult = new Image(new ByteArrayInputStream(buffer.toArray()));
 		setImageResult(imageResult);
 		
-		// Layers test
-		Imgcodecs.imencode(".jpg", intensityF, buffer);
-		imageResultTest = new Image(new ByteArrayInputStream(buffer.toArray()));
-		setImageResultTest(imageResultTest);	
+		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-final.jpg", image);
+		
+		// Uncomment to get all layers from both images
+		/*
+		Imgcodecs.imwrite(getImageNoFlash().substring(0,getImageNoFlash().lastIndexOf("."))+"-intensity.jpg", intensityNF);
+		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-intensity.jpg", intensityF);
+		
+		Imgcodecs.imwrite(getImageNoFlash().substring(0,getImageNoFlash().lastIndexOf("."))+"-largeScale.jpg", largeScaleNF);
+		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-largeScale.jpg", largeScaleF);
+		
+		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-detail.jpg", detail);
+		Imgcodecs.imwrite(getImageNoFlash().substring(0,getImageNoFlash().lastIndexOf("."))+"-detail.jpg", detailNF);
+		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-color.jpg", color);
+		Imgcodecs.imwrite(getImageNoFlash().substring(0,getImageNoFlash().lastIndexOf("."))+"-color.jpg", colorNF);
+		*/
+	}
+	
+	/**
+     * Method computes umbra shadow according to histogram analysis
+     * @param image with flash, image without flash
+     * @return umbra
+    */
+	private Mat shadowUmbra(Mat flashImg, Mat noFlashImg) {
+		Mat umbra = new Mat();
+		Mat delta = new Mat();
+		Mat histogram = new Mat(); // computed histogram
+		int numberOfBins = 128;
+		MatOfInt channels = new MatOfInt(0, 2);
+		MatOfInt histSize = new MatOfInt(numberOfBins);
+		MatOfFloat ranges = new MatOfFloat(0, 256);
+		List<Mat> deltaToHist = new LinkedList<Mat>();
+		
+		Core.subtract(flashImg, noFlashImg, delta);
+
+		deltaToHist.add(delta);
+		Imgproc.calcHist(deltaToHist, channels, new Mat(), histogram, histSize, ranges, false);
+		
+		return umbra;
 	}
 	
 	/**
@@ -137,7 +167,7 @@ public class ImageController {
 		imgF.convertTo(imgF, CvType.CV_64F);
 		imgNF.convertTo(imgNF, CvType.CV_64F);
 		Mat output = new Mat();
-		double pow = 0.1;
+		double pow = 0.2;
 		double weightR = 0.0;
 		double weightG = 0.0;
 		double weightB = 0.0;
@@ -183,7 +213,7 @@ public class ImageController {
 		double sigmaColor = 40;
 		double sigmaSpace = 40;
  
-		Imgproc.bilateralFilter(intensity, output, 15, sigmaColor, sigmaSpace);
+		Imgproc.bilateralFilter(intensity, output, 150, sigmaColor, sigmaSpace);
 		
 		return output;
 	}
@@ -222,7 +252,6 @@ public class ImageController {
     */
 	private Mat computeIntensity(Mat img) {
 		img.convertTo(img, CvType.CV_64FC3);
-		Mat sum = new Mat();
 		Mat divR = new Mat();
 		Mat divG = new Mat();
 		Mat divB = new Mat();
@@ -230,17 +259,18 @@ public class ImageController {
 		Mat intensG = new Mat();
 		Mat intensB = new Mat();
 		Mat intensity = new Mat();
+		Mat sum = new Mat();
 		
 		List<Mat> rgb = getRGB(img);
 				
+		// Getting intensity according to formula in the article I = (R/sum(R,G,B))*R + (G/sum(R,G,B))*G + (B/sum(R,G,B))*B
 		Core.add(rgb.get(0), rgb.get(1), sum);
 		Core.add(sum, rgb.get(2), sum);
-				
-		// Getting intensity according to formula in the article I = (R/sum(R,G,B))*R + (G/sum(R,G,B))*G + (B/sum(R,G,B))*B
+		
 		Core.divide(rgb.get(0), sum, divR);
 		Core.divide(rgb.get(1), sum, divG);
 		Core.divide(rgb.get(2), sum, divB);
-
+		
 		Core.multiply(divR, rgb.get(0), intensR);
 		Core.multiply(divG, rgb.get(1), intensG);
 		Core.multiply(divB, rgb.get(2), intensB);
@@ -261,7 +291,7 @@ public class ImageController {
 		Object minValue = Collections.min(Mat2Double(img)).intValue();
 		Object maxValue = Collections.max(Mat2Double(img)).intValue();
 
-		int range = (int) maxValue - (int)minValue;
+		int range = (int) maxValue - (int) minValue;
 		float alpha = (float) 255 / range;
 		float beta = (int) minValue * alpha;
 		
@@ -289,7 +319,7 @@ public class ImageController {
 	}
 	
 	/**
-     * Method converts Mat do List of Double
+     * Method converts Mat to List of Doubles
      * @param image to convert
      * @return list
     */
@@ -336,13 +366,13 @@ public class ImageController {
     */
 	private double getSum(List<Double> list) {
 		double sum = 0.0;
+		
 		Iterator<Double> iterator = list.iterator();
 		while (iterator.hasNext()) {
 			sum =+ iterator.next();
 		}
+
 		return sum;
 	}
-
-		
 
 }

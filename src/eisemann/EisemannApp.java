@@ -25,7 +25,6 @@ public class EisemannApp extends Application {
 	     initRootLayout();
 	     showContent();
 	}
-
 	/**
      * Initializes the root layout.
      */
