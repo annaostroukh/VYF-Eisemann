@@ -74,11 +74,12 @@ public class ImageController {
 		imgNoFlash = Imgcodecs.imread(getImageNoFlash());
 		imgFlash = Imgcodecs.imread(getImageFlash());
 		Mat intensityF = computeIntensity(imgFlash);
-		Mat intensityNF = computeIntensity(imgNoFlash);
-		Mat largeScaleNF = computeLargeScale(intensityNF);
+		Mat intensityNF = computeIntensityNF(imgFlash, imgNoFlash);
+		Mat intensityNFLarge = computeIntensity(imgNoFlash);
+		Mat largeScaleNF = computeLargeScale(intensityNFLarge);
 		Mat largeScaleF = computeLargeScale(intensityF);
 		Mat detail = computeDetail(intensityF, largeScaleF);
-		Mat detailNF = computeDetail(intensityNF, largeScaleNF);
+		Mat detailNF = computeDetail(intensityNFLarge, largeScaleNF);
 		Mat color = computeColor(imgFlash, intensityF);
 		Mat colorNF = computeColor(imgNoFlash, intensityNF);
 		Mat finalR = new Mat();
@@ -130,6 +131,7 @@ public class ImageController {
 		
 		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-detail.jpg", detail);
 		Imgcodecs.imwrite(getImageNoFlash().substring(0,getImageNoFlash().lastIndexOf("."))+"-detail.jpg", detailNF);
+		
 		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-color.jpg", color);
 		Imgcodecs.imwrite(getImageNoFlash().substring(0,getImageNoFlash().lastIndexOf("."))+"-color.jpg", colorNF);
 		*/
@@ -194,10 +196,11 @@ public class ImageController {
      * @return detail layer
     */
 	private Mat computeDetail(Mat intensity, Mat largeScale) {
-		intensity.convertTo(intensity, CvType.CV_32F);
+		intensity.convertTo(intensity, CvType.CV_64F);
+		largeScale.convertTo(largeScale, CvType.CV_64F);
 		Mat detail = new Mat();
 		
-		Core.divide(intensity, largeScale, detail, 255.0);
+		Core.divide(intensity, largeScale, detail);
 	
 		return bcNormalize(detail);
 	}
@@ -211,8 +214,8 @@ public class ImageController {
 		intensity.convertTo(intensity, CvType.CV_32F);
 		Mat output = new Mat();
 		double sigmaColor = 40;
-		double sigmaSpace = 150;
-		int neighbourhoodDiameter = 40;
+		double sigmaSpace = 40;
+		int neighbourhoodDiameter = 150;
  
 		Imgproc.bilateralFilter(intensity, output, neighbourhoodDiameter, sigmaColor, sigmaSpace); 
 		
@@ -233,9 +236,9 @@ public class ImageController {
 		
 		List<Mat> rgb = getRGB(img);
 		
-		Core.divide(rgb.get(0), intensity, colorR, 255.0, CvType.CV_8UC1);
-		Core.divide(rgb.get(1), intensity, colorG, 255.0, CvType.CV_8UC1);
-		Core.divide(rgb.get(2), intensity, colorB, 255.0, CvType.CV_8UC1);
+		Core.divide(rgb.get(0), intensity, colorR, 255.0, CvType.CV_8U);
+		Core.divide(rgb.get(1), intensity, colorG, 255.0, CvType.CV_8U);
+		Core.divide(rgb.get(2), intensity, colorB, 255.0, CvType.CV_8U);
 		
 		List<Mat> colorRGB = new ArrayList<Mat>(3);
 		colorRGB.add(0,colorR);
@@ -283,6 +286,45 @@ public class ImageController {
 	}
 	
 	/**
+     * Method computes the intensity layer of non flash image
+     * For this RGB channels of flash image has to be used as weights
+     * @param image matrix, non flash image matrix
+     * @return intensity
+    */
+	private Mat computeIntensityNF(Mat img, Mat imgNF) {
+		img.convertTo(img, CvType.CV_64FC3);
+		imgNF.convertTo(imgNF, CvType.CV_64FC3);
+		Mat divR = new Mat();
+		Mat divG = new Mat();
+		Mat divB = new Mat();
+		Mat intensR = new Mat();
+		Mat intensG = new Mat();
+		Mat intensB = new Mat();
+		Mat intensity = new Mat();
+		Mat sum = new Mat();
+		
+		List<Mat> rgb = getRGB(img);
+		List<Mat> rgbNF = getRGB(imgNF);
+				
+		// Getting intensity according to formula in the article I = (R/sum(R,G,B))*R + (G/sum(R,G,B))*G + (B/sum(R,G,B))*B
+		Core.add(rgb.get(0), rgb.get(1), sum);
+		Core.add(sum, rgb.get(2), sum);
+		
+		Core.divide(rgbNF.get(0), sum, divR);
+		Core.divide(rgbNF.get(1), sum, divG);
+		Core.divide(rgbNF.get(2), sum, divB);
+		
+		Core.multiply(divR, rgbNF.get(0), intensR);
+		Core.multiply(divG, rgbNF.get(1), intensG);
+		Core.multiply(divB, rgbNF.get(2), intensB);
+				
+		Core.add(intensR, intensG, intensity);
+		Core.add(intensity, intensB, intensity);
+		
+		return bcNormalize(intensity);
+	}
+	
+	/**
      * Method normalize output values after arithmetical operations
      * @param image to normalize 
      * @return normalized image
@@ -293,8 +335,8 @@ public class ImageController {
 		Object maxValue = Collections.max(Mat2Double(img)).intValue();
 
 		int range = (int) maxValue - (int) minValue;
-		float alpha = (float) 255 / range;
-		float beta = (int) minValue * alpha;
+		double alpha = (double) 255 / range;
+		double beta = (int) minValue * alpha;
 		
 		img.convertTo(img, CvType.CV_64F, alpha, -beta);
 		
