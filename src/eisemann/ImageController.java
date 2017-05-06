@@ -211,9 +211,10 @@ public class ImageController {
 		intensity.convertTo(intensity, CvType.CV_32F);
 		Mat output = new Mat();
 		double sigmaColor = 40;
-		double sigmaSpace = 40;
+		double sigmaSpace = 150;
+		int neighbourhoodDiameter = 40;
  
-		Imgproc.bilateralFilter(intensity, output, 150, sigmaColor, sigmaSpace);
+		Imgproc.bilateralFilter(intensity, output, neighbourhoodDiameter, sigmaColor, sigmaSpace); 
 		
 		return output;
 	}
