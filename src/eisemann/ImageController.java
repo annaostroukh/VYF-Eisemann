@@ -92,13 +92,13 @@ public class ImageController {
 		largeScaleNF.convertTo(largeScaleNF, CvType.CV_64F);
 		detail.convertTo(detail, CvType.CV_64F);
 		
-		Core.add(detail, largeScaleNF, image);
+		Core.multiply(detail, largeScaleNF, image);
 		
 		List<Mat> rgb = getRGB(color);
 	
-		Core.add(image, rgb.get(0), finalR);
-		Core.add(image, rgb.get(1), finalG);
-		Core.add(image, rgb.get(2), finalB);
+		Core.multiply(image, rgb.get(0), finalR);
+		Core.multiply(image, rgb.get(1), finalG);
+		Core.multiply(image, rgb.get(2), finalB);
 		
 		Scalar R = new Scalar(weights.get(0));
 		Scalar G = new Scalar(weights.get(1));
@@ -127,6 +127,7 @@ public class ImageController {
 		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-intensity.jpg", intensityF);
 		
 		Imgcodecs.imwrite(getImageNoFlash().substring(0,getImageNoFlash().lastIndexOf("."))+"-largeScale.jpg", largeScaleNF);
+		
 		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-largeScale.jpg", largeScaleF);
 		
 		Imgcodecs.imwrite(getImageFlash().substring(0,getImageFlash().lastIndexOf("."))+"-detail.jpg", detail);
@@ -202,7 +203,8 @@ public class ImageController {
 		
 		Core.divide(intensity, largeScale, detail);
 	
-		return bcNormalize(detail);
+		//return bcNormalize(detail);
+		return detail;
 	}
 	
 	/**
@@ -283,6 +285,7 @@ public class ImageController {
 		Core.add(intensity, intensB, intensity);
 		
 		return bcNormalize(intensity);
+		//return intensity;
 	}
 	
 	/**
@@ -322,6 +325,7 @@ public class ImageController {
 		Core.add(intensity, intensB, intensity);
 		
 		return bcNormalize(intensity);
+		//return intensity;
 	}
 	
 	/**
